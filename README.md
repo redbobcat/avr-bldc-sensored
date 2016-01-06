@@ -1,2 +1,3 @@
 # avr-bldc-sensored
-Code for bldc driver (and board later)
+Code for bldc driver (and board later(allready done, but not tested))
+And trying to use git.
