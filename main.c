@@ -47,59 +47,58 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
-#include "uart.h"
+#include "usart.h"
 
 
-inline void bldc_out_init (void); //bldc out port configure, output, sets to 0
+inline void 	bldc_out_init (void); //bldc out port configure, output, sets to 0
 
-inline void bldc_hall_init (void); //bldc hall in configure, input, hi-z
+inline void 	bldc_hall_init (void); //bldc hall in configure, input, hi-z
 
-inline uint8_t bldc_hall_state (void); //returns hall sensor state
+inline uint8_t 	bldc_hall_state (void); //returns hall sensor state
 
-void bldc_out_set (uint8_t); //closes all gates and sets all to next
+void 			bldc_out_set (uint8_t); //closes all gates and sets all to next
 
-uint8_t bldc_switch (uint8_t hallin, uint8_t direction); //2 for CCW, 0 for none, 1 for CW
+uint8_t 		bldc_switch (uint8_t hallin, uint8_t direction); //2 for CCW, 0 for none, 1 for CW
 
-const uint8_t bldc_state[] = {0b00100001, 0b00001001, 0b00011000, 0b00010010, 0b00000110, 0b00100100}; //output table for switching
+const uint8_t 	bldc_state[] = {0b00100001, 0b00001001, 0b00011000, 0b00010010, 0b00000110, 0b00100100}; //output table for switching
 
-inline void bldc_start (uint8_t); //2 for CCW, 0 for none, 1 for CW
+inline void 	bldc_start (uint8_t); //2 for CCW, 0 for none, 1 for CW
+
+inline void 	bldc_stop (void);
+
 
 //enable pinchange interrupt for PB0-PB2
-void bldc_interupt_enable (void);
+inline void		bldc_interupt_enable (void);
+inline void		bldc_interupt_disable (void);
 // ISR of pinchange interupt is in the end of file
 
-void bldc_pwm_enable (void);
-#define PWM_DRIVE OCR0A;
+void 			bldc_pwm_enable (void);
+//#define PWM_DRIVE OCR0A;
 
 //temp section for debug
-uint8_t dir=1, pwm=80;
+uint8_t dir=1, pwm=255;
 
 void main(void)
 {
-	uart_init(UART_BAUD_SELECT(9600,F_CPU));
-	sei();
-	uart_putc(0x0a); // new line
-	uart_puts_p(PSTR("BLDCdrvr0chk"));
-	uart_putc(0x0a); // new line
+	USART_Init(MYUBRR);
 	
 	bldc_hall_init();
 	
-	uart_puts_p(PSTR("Hall"));
-	uart_putc(0x0a); // new line
-	
 	bldc_out_init();
 	
-	uart_puts_p(PSTR("Out init"));
-	uart_putc(0x0a); // new line
+	bldc_pwm_enable();
+	
+	OCR0A = pwm;
+	bldc_interupt_enable();
+	sei();
+	
+	for (;;)
+		{
+			_delay_ms(20);
+		}
 	
 	
-	
-	
-	
-	
-	
-	
-	
+		
 }
 
 inline void bldc_out_init (void)
@@ -147,26 +146,42 @@ uint8_t bldc_switch (uint8_t hallin, uint8_t direction)
 
 inline void bldc_start (uint8_t cwccw)
 	{
-			bldc_switch(bldc_hall_state(),cwccw);
+			PHASE_PORT=bldc_switch(bldc_hall_state(),cwccw);
+			OCR0A = 125;
+			//_delay_ms(20);
+			bldc_interupt_enable();
 			sei();
 	}
+	
+inline void bldc_stop(void)
+	{
+			
+			bldc_interupt_disable();
+			PHASE_PORT &= ~(PHASE_MASK);
+	}
 
-void bldc_interupt_enable (void)
+inline void bldc_interupt_enable (void)
 	{
 			PCICR |= 1<<PCIE0;
 			PCMSK0|= HALL_MASK;
 	}
+	
+inline void	bldc_interupt_disable (void)
+	{
+			PCICR &= ~(1<<PCIE0);
+			PCMSK0 &= ~(HALL_MASK);
+	}
 
 ISR(PCINT0_vect)
 	{
-			bldc_switch(bldc_hall_state(), dir);
+			PHASE_PORT=bldc_switch(bldc_hall_state(), dir);
 			sei();
 	}
 
 void bldc_pwm_enable (void)
 	{
-			TCCR0A |= 1<<COM0A1 & 1<<WGM00 & 1<<WGM01; //set fast-pwm, non-inverting out
+			TCCR0A |= (1<<COM0A1) | (1<<WGM00) | (1<<WGM01); //set fast-pwm, non-inverting out
+			DDRD |= 1<<PD6;
 			TCCR0B |= 1<<CS00; //start at full speed
-			DDRD |= 1<< PD6;
 			
 	}

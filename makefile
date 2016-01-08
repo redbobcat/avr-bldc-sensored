@@ -11,7 +11,7 @@
 # MCU = attiny2313
 # MCU = atmega8
 # MCU = attiny45
-MCU = atmega48
+MCU = atmega48p
 
 # Target file name (without extension).
 TARGET = main
@@ -37,7 +37,7 @@ FORMAT = ihex
 
 # List C source files here. (C dependencies are automatically generated.)
 SRC = $(TARGET).c \
-uart.c \
+usart.c \
 
 
 # If there is more than one source file, append them above, or modify and
