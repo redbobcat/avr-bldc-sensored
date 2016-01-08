@@ -110,11 +110,11 @@ inline void bldc_out_init (void)
 inline void bldc_hall_init (void)
 	{
 		HALL_DDR &= ~(HALL_MASK);
-		HALL_PORT &= ~(HALL_MASK);
+		//HALL_PORT |= (HALL_MASK);
 	}
 inline uint8_t bldc_hall_state (void)
 	{
-	return HALL_PIN & HALL_MASK;	
+	return HALL_PIN & HALL_MASK;
 	}
 void bldc_out_set (uint8_t in)
 	{
@@ -175,6 +175,7 @@ inline void	bldc_interupt_disable (void)
 ISR(PCINT0_vect)
 	{
 			PHASE_PORT=bldc_switch(bldc_hall_state(), dir);
+			//USART_Transmit(0x30+bldc_hall_state());
 			sei();
 	}
 
