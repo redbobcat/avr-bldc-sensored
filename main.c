@@ -211,12 +211,12 @@ uint8_t bldc_switch (uint8_t hallin, uint8_t direction)
 		
 		switch (hallin)
 				{
-				case 0b00000101: {state_temp=bldc_state[4+direction-1]; break;}
-				case 0b00000001: {state_temp=bldc_state[5+direction-1]; break;}
-				case 0b00000011: {state_temp=bldc_state[0+direction-1]; break;}
-				case 0b00000010: {state_temp=bldc_state[1+direction-1]; break;}
-				case 0b00000110: {state_temp=bldc_state[2+direction-1]; break;}
-				case 0b00000100: {state_temp=bldc_state[3+direction-1]; break;}
+				case 0b00000101: {state_temp=bldc_state[3+direction-1]; break;}
+				case 0b00000001: {state_temp=bldc_state[4+direction-1]; break;}
+				case 0b00000011: {state_temp=bldc_state[5+direction-1]; break;}
+				case 0b00000010: {state_temp=bldc_state[0+direction-1]; break;}
+				case 0b00000110: {state_temp=bldc_state[1+direction-1]; break;}
+				case 0b00000100: {state_temp=bldc_state[2+direction-1]; break;}
 				}
 			}
 			
@@ -305,8 +305,8 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 				}
 			if (ten_sec==0)
 				{
-					rpm = ticks*30;
-					rpm /=13;
+					rpm = ticks/3;
+					rpm *= 50;
 					ticks =0;
 					
 						buttons_pressed |= buttons();
