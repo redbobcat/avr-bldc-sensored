@@ -33,6 +33,7 @@
 #define PHASE_PORT PORTC
 #define PHASE_PIN PINC
 #define PHASE_MASK 0b00111111 //may be usefull, MUST BE CHANGED IF SCHEME CHANGED
+#define PHASE_STOP_MASK 0b00010101
 //in pins for hall sensors outbut. With amp. 
 //now B, 0 to 2 "U V W"
 #define HALL_DDR DDRB
@@ -46,9 +47,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 #include "usart.h"
-
+#include "buttons.h"
 
 
 //funcs for bldc drive
@@ -79,7 +80,7 @@ inline void 	bldc_all_init (void); //all init in one
 void counter2_init (void);
 //ISR is in the end
 //variables for counter
-volatile uint8_t one_sec=50,ten_sec=5;
+volatile uint8_t one_sec=51,ten_sec=6;
 
 
 //ACD functions
@@ -87,12 +88,18 @@ void ADC_init (void); // init of ADC
 void ADC_start (uint8_t); // starts converson on ch
 
 volatile uint8_t adc_ch[2];
-volatile uint8_t adc_ch_now=6;
+volatile uint8_t adc_ch_now=6, send;
 
+volatile uint8_t buttons_pressed, dir=0;
+#define BUTTON_RIGHT 0b10000000
+#define BUTTON_LEFT 0b00100000
+#define BUTTON_ONE 0b00000100
+
+//speed mesure
+volatile uint16_t ticks=0, rpm=0, current;
 
 
 //temp section for debug
-uint8_t dir=1, pwm=0;
 
 void main(void)
 {
@@ -103,26 +110,65 @@ void main(void)
 	ADC_init();
 	counter2_init();
 	
+	buttons_init();
+	
+	DDRD |= (1<<PD3) | (1<<PD4);
+	
 	sei();
-	
-	bldc_start(dir);
-	PWM_POWER=200;
-	
 	
 	for (;;)
 		{
 			PWM_POWER=adc_ch[1];
-			USART_Transmit('P');
 			
-			USART_Transmit(0x30+adc_ch[1]/100);
-			USART_Transmit(0x30+((adc_ch[1]%100)/10));
-			USART_Transmit(0x30+adc_ch[1]%10);
-			USART_Transmit('I');
-			USART_Transmit(0x30+adc_ch[0]/100);
-			USART_Transmit(0x30+((adc_ch[0]%100)/10));
-			USART_Transmit(0x30+adc_ch[0]%10);
-			
+			if ((buttons_pressed & BUTTON_RIGHT) && (dir)==0)
+				{
+					dir=1;
+					bldc_start(dir);
+					buttons_pressed=0;
+					PORTD |= 1<<PD3;
 					
+				}
+			if ((buttons_pressed & BUTTON_LEFT) && (dir)==0)
+				{
+					dir=2;
+					bldc_start(dir);
+					buttons_pressed=0;
+					PORTD |= 1<<PD4;
+				}
+			if (dir && (buttons_pressed & BUTTON_ONE))
+				{
+					dir=0;
+					bldc_stop();
+					buttons_pressed=0;
+					PORTD &= ~((1<<PD3)|(1<<PD4));
+				}
+				
+			if (send==1)
+				{
+					USART_Transmit('R');
+
+					USART_Transmit(0x30+(rpm/10000));
+					USART_Transmit(0x30+((rpm/1000)%10));
+					USART_Transmit(0x30+((rpm/100)%10));
+					USART_Transmit(0x30+((rpm/10)%10));
+					USART_Transmit(0x30+(rpm%10));
+					
+					USART_Transmit(10);
+					
+					current = adc_ch[0]*20;
+
+					USART_Transmit('I');
+
+					USART_Transmit(0x30+(current/10000));
+					USART_Transmit(0x30+((current/1000)%10));
+					USART_Transmit(0x30+((current/100)%10));
+					USART_Transmit(0x30+((current/10)%10));
+					USART_Transmit(0x30+(current%10));
+					
+					USART_Transmit(10);
+					send=0;
+						
+				}
 			
 		}
 	
@@ -154,7 +200,7 @@ void bldc_out_set (uint8_t in)
 
 uint8_t bldc_switch (uint8_t hallin, uint8_t direction)
 	{	uint8_t state_temp=0;
-		
+		if (ticks<65535) ticks++;
 		
 		if (direction==0)
 			{
@@ -178,12 +224,12 @@ uint8_t bldc_switch (uint8_t hallin, uint8_t direction)
 			{
 				switch (hallin)
 				{
-				case 0b00000101: {state_temp=bldc_state[0+direction-1]; break;}
-				case 0b00000001: {state_temp=bldc_state[1+direction-1]; break;}
-				case 0b00000011: {state_temp=bldc_state[2+direction-1]; break;}
-				case 0b00000010: {state_temp=bldc_state[3+direction-1]; break;}
-				case 0b00000110: {state_temp=bldc_state[4+direction-1]; break;}
-				case 0b00000100: {state_temp=bldc_state[5+direction-1]; break;}
+				case 0b00000101: {state_temp=bldc_state[5+direction-1]; break;}
+				case 0b00000001: {state_temp=bldc_state[0+direction-1]; break;}
+				case 0b00000011: {state_temp=bldc_state[1+direction-1]; break;}
+				case 0b00000010: {state_temp=bldc_state[2+direction-1]; break;}
+				case 0b00000110: {state_temp=bldc_state[3+direction-1]; break;}
+				case 0b00000100: {state_temp=bldc_state[4+direction-1]; break;}
 				}
 			}
 				
@@ -193,7 +239,8 @@ uint8_t bldc_switch (uint8_t hallin, uint8_t direction)
 inline void bldc_start (uint8_t cwccw)
 	{
 			PHASE_PORT=bldc_switch(bldc_hall_state(),cwccw);
-			OCR0A = 200;
+			PWM_POWER = 255;
+			_delay_ms(30);
 			bldc_interupt_enable();
 			sei();
 	}
@@ -203,6 +250,7 @@ inline void bldc_stop(void)
 			
 			bldc_interupt_disable();
 			PHASE_PORT &= ~(PHASE_MASK);
+			//PHASE_PORT |= PHASE_STOP_MASK;
 	}
 
 inline void bldc_interupt_enable (void)
@@ -218,7 +266,7 @@ inline void	bldc_interupt_disable (void)
 	}
 
 ISR(PCINT0_vect)
-	{
+	{		
 			PHASE_PORT=bldc_switch(bldc_hall_state(), dir);
 			//USART_Transmit(0x30+bldc_hall_state());
 			sei();
@@ -243,7 +291,7 @@ inline void bldc_all_init(void)
 void counter2_init (void)
 	{
 		TCCR2A |= (1<<WGM21); //CTC mode
-		TCCR2B |= (7<<CS20); //prescaler /1024
+		TCCR2B |= 7;//(7<<CS20); //prescaler /1024
 		OCR2A=234;  //234 gives 50 ints/s
 		TIMSK2 |= (1<<OCIE2A); //enabling A interupt
 	}
@@ -252,11 +300,16 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 	{
 			if (one_sec==0)
 				{
-					USART_Transmit('t');
+					send=1;
 					one_sec=51;
 				}
 			if (ten_sec==0)
 				{
+					rpm = ticks*30;
+					rpm /=13;
+					ticks =0;
+					
+						buttons_pressed |= buttons();
 						if (adc_ch_now==6)
 							{
 								adc_ch[0] = ADCH;

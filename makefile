@@ -38,6 +38,8 @@ FORMAT = ihex
 # List C source files here. (C dependencies are automatically generated.)
 SRC = $(TARGET).c \
 usart.c \
+buttons.c \
+
 
 
 # If there is more than one source file, append them above, or modify and
