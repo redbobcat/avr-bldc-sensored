@@ -9,6 +9,7 @@
 #define BUTT_1 2 //first button bit
 #define BUTT_2 5 //second button bit
 #define BUTT_3 7 //third button bit
+#define BUTT_MASK 0b10100100
 //#define BUTT_4 3 //four button bit
 
 

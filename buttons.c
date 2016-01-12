@@ -12,7 +12,7 @@ b_temp = ~buttons_prev & BUTT_PIN; //mask for result
 buttons_prev=BUTT_PIN; //save prev
 
 
-return b_temp & 0b10100100;
+return b_temp & BUTT_MASK;
 }
 
 

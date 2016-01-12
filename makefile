@@ -39,6 +39,8 @@ FORMAT = ihex
 SRC = $(TARGET).c \
 usart.c \
 buttons.c \
+bldc.c
+
 
 
 
