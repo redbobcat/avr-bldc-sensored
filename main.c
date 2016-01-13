@@ -33,10 +33,11 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
-//#include <avr/pgmspace.h>
-#include "usart.h"
+#include <avr/pgmspace.h>
+#include "uart.h"
 #include "buttons.h"
 #include "bldc.h"
+#include <stdio.h>
 
 
 
@@ -56,7 +57,7 @@ volatile uint8_t adc_ch[2];
 volatile uint8_t adc_ch_now=6, send=0;
 
 //speed mesure and current
-volatile uint16_t rpm=0, current=0;
+volatile uint16_t rpm=0, current=0, temp_num=0;
 
 
 //buttons and some other
@@ -69,7 +70,9 @@ volatile uint8_t buttons_pressed;
 
 void main(void)
 {
-	USART_Init(MYUBRR);
+	uart_init(UART_BAUD_SELECT(19200,F_CPU));
+	
+	uart_puts_P("BLDC drv\n");
 		
 	bldc_all_init();
 	
@@ -86,20 +89,23 @@ void main(void)
 		{
 			PWM_POWER=adc_ch[1];
 			
-			if ((buttons_pressed & BUTTON_RIGHT) && (dir)==0)
+			if ((buttons_pressed & BUTTON_RIGHT) && (dir)==0) //start CW
 				{
 					dir=1;
 					bldc_start(dir);
 					buttons_pressed=0;
 					PORTD |= 1<<PD3;
 					
+					
 				}
-			if ((buttons_pressed & BUTTON_LEFT) && (dir)==0)
+			if ((buttons_pressed & BUTTON_LEFT) && (dir)==0) //start CCW
 				{
 					dir=2;
 					bldc_start(dir);
 					buttons_pressed=0;
 					PORTD |= 1<<PD4;
+					
+					
 				}
 			if (dir && (buttons_pressed & BUTTON_ONE))
 				{
@@ -107,35 +113,30 @@ void main(void)
 					bldc_stop();
 					buttons_pressed=0;
 					PORTD &= ~((1<<PD3)|(1<<PD4));
+					send=0;
 				}
 				
-			if (send==1)
-				{
-					USART_Transmit('R');
-
-					USART_Transmit(0x30+(rpm/10000));
-					USART_Transmit(0x30+((rpm/1000)%10));
-					USART_Transmit(0x30+((rpm/100)%10));
-					USART_Transmit(0x30+((rpm/10)%10));
-					USART_Transmit(0x30+(rpm%10));
-					
-					USART_Transmit(10);
-					
-					current = adc_ch[0]*20;
-
-					USART_Transmit('I');
-
-					USART_Transmit(0x30+(current/10000));
-					USART_Transmit(0x30+((current/1000)%10));
-					USART_Transmit(0x30+((current/100)%10));
-					USART_Transmit(0x30+((current/10)%10));
-					USART_Transmit(0x30+(current%10));
-					
-					USART_Transmit(10);
-					send=0;
-						
-				}
-			
+			if (send)
+						{
+							char out[10];
+							temp_num++;
+							sprintf(out, "%d", temp_num);
+							//uitoa(temp_num,out,10);
+							
+							uart_puts(out);
+							uart_putc(',');
+							//uitoa(rpm,out,10);
+							sprintf(out, "%d", rpm);
+							uart_puts(out);
+							uart_putc(',');
+							//uitoa(adc_ch[1],out,10);
+							sprintf(out, "%d", adc_ch[1]);
+							uart_puts(out);
+							uart_putc('\n');
+							send=0;
+											
+						}
+				
 		}
 	
 	
@@ -167,9 +168,13 @@ void ADC_start (uint8_t chno)
 
 ISR (TIMER2_COMPA_vect) //50 times/s
 	{
+		
+			
+			
+			
 			if (one_sec==0)
 				{
-					send=1;
+					
 					one_sec=51;
 				}
 			if (ten_sec==0)
@@ -177,6 +182,8 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 					rpm = ticks/3;
 					rpm *= 50;
 					ticks =0;
+					if (dir) send=1;
+						
 					
 						buttons_pressed |= buttons();
 						if (adc_ch_now==6)
@@ -194,6 +201,7 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 						
 						ten_sec=6;
 				}
+			
 			
 			ten_sec--;
 			one_sec--;

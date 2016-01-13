@@ -37,7 +37,7 @@ FORMAT = ihex
 
 # List C source files here. (C dependencies are automatically generated.)
 SRC = $(TARGET).c \
-usart.c \
+uart.c \
 buttons.c \
 bldc.c
 
