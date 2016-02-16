@@ -39,7 +39,8 @@ FORMAT = ihex
 SRC = $(TARGET).c \
 uart.c \
 buttons.c \
-bldc.c
+bldc.c \
+pid.c
 
 
 

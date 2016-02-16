@@ -38,6 +38,7 @@
 #include "buttons.h"
 #include "bldc.h"
 #include <stdio.h>
+#include "pid.h"
 
 
 
@@ -54,10 +55,10 @@ void ADC_init (void); // init of ADC
 void ADC_start (uint8_t); // starts converson on ch
 
 volatile uint8_t adc_ch[2];
-volatile uint8_t adc_ch_now=6, send=0;
+volatile uint8_t adc_ch_now=6, send=0, pid=0;
 
 //speed mesure and current
-volatile uint16_t rpm=0, current=0, temp_num=0;
+volatile uint16_t rpm=0, target_rpm=0, current=0, temp_num=0;
 
 
 //buttons and some other
@@ -81,13 +82,13 @@ void main(void)
 	
 	buttons_init();
 	
-	DDRD |= (1<<PD3) | (1<<PD4);
+	DDRD |= (1<<PD3) | (1<<PD4); //leds on board
 	
 	sei();
 	
 	for (;;)
 		{
-			PWM_POWER=adc_ch[1];
+			//PWM_POWER=adc_ch[1];
 			
 			if ((buttons_pressed & BUTTON_RIGHT) && (dir)==0) //start CW
 				{
@@ -107,7 +108,7 @@ void main(void)
 					
 					
 				}
-			if (dir && (buttons_pressed & BUTTON_ONE))
+			if (dir && (buttons_pressed & BUTTON_ONE)) //stop
 				{
 					dir=0;
 					bldc_stop();
@@ -136,6 +137,19 @@ void main(void)
 							send=0;
 											
 						}
+						
+						
+			if (pid)
+					{
+						int16_t pwm_temp;
+						pwm_temp = PWM_POWER;
+						pwm_temp += PID(target_rpm - rpm);
+						if (pwm_temp>255) pwm_temp=255;
+						if (pwm_temp<0) pwm_temp=0;
+						PWM_POWER = pwm_temp;
+						pid=0;
+						
+					}
 				
 		}
 	
@@ -172,34 +186,40 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 			
 			
 			
-			if (one_sec==0)
+			if (one_sec==0) //1 time in sec
 				{
 					
 					one_sec=51;
 				}
-			if (ten_sec==0)
+			if (ten_sec==0) //10 tims in sec
 				{
 					rpm = ticks/3;
 					rpm *= 50;
 					ticks =0;
-					if (dir) send=1;
+					if (dir) 
+						{
+							send=1;
+							pid=1;
+						}
 						
 					
 						buttons_pressed |= buttons();
 						if (adc_ch_now==6)
-							{
+							{ //from isense resistor
 								adc_ch[0] = ADCH;
 								adc_ch_now=7;
 								ADC_start(adc_ch_now); 
 							}
 						else
-							{
+							{ //from potentiometer
 								adc_ch[1] = ADCH;
 								adc_ch_now=6;
-								ADC_start(adc_ch_now); 
+								ADC_start(adc_ch_now);
+								target_rpm = adc_ch[1]*50;
 							}
 						
 						ten_sec=6;
+						
 				}
 			
 			

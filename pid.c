@@ -1,12 +1,10 @@
 #include "pid.h"
 
+volatile int16_t delta_prev;
 
-
-int16_t delta_prev;
-
-uint8_t PID (int16_t delta)
+int16_t PID (int16_t delta)
 	{
-		double_t U, I;
+		double_t U, I, D;
 		
 		U  = delta * Kp;
 		
@@ -19,4 +17,6 @@ uint8_t PID (int16_t delta)
 		U += I + D;
 		
 		delta_prev=delta;
+		
+		return (U/CHANGE_STEP);
 	}
