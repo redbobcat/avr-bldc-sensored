@@ -30,16 +30,20 @@
 #define ADC_WIPER 7 //in from potentiometer, 0-5V
 #define ADC_CURRENT_SENCE 6 //in from amp, 1V to 1A
 
+//#define DEBUG
+
 #include <avr/io.h>
 //#include <util/delay.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
-//#include "uart.h"
+//#include <avr/pgmspace.h>
 #include "buttons.h"
 #include "bldc.h"
-//#include <stdio.h>
 #include "pid.h"
 
+#ifdef DEBUG
+	#include "uart.h"
+	#include <stdio.h>
+#endif
 
 
 
@@ -69,7 +73,7 @@ volatile uint8_t status_byte=0;
 //#define FULL 0x08
 
 //speed mesure and current
-volatile uint16_t rpm=0, target_rpm=0, temp_num=0;
+volatile uint16_t rpm=0, target_rpm=0;
 
 
 //buttons and some other
@@ -82,9 +86,12 @@ volatile uint8_t buttons_pressed;
 
 void main(void)
 {
-	//uart_init(UART_BAUD_SELECT(19200,F_CPU));
-	
-	//uart_puts_P("BLDC drv\n");
+#ifdef DEBUG
+	uart_init(UART_BAUD_SELECT(19200,F_CPU));
+#endif
+
+	struct PID_DATA firstPID;
+	initializePID(&firstPID, 0.02, 0.0001, 0.00002); //0.01 0.0001 0.00001 works
 		
 	bldc_all_init();
 	
@@ -127,17 +134,11 @@ void main(void)
 					PORTD &= ~((1<<PD3)|(1<<PD4));
 					CLEARBIT(status_byte,_send);
 				}
-				
-			/*if (CHECKBIT(status_byte,_send))
+		#ifdef DEBUG
+			if (CHECKBIT(status_byte,_send))
 						{
-							char out[6];
-							temp_num++;
-							sprintf(out, "%d", temp_num);
-							
-							
-							uart_puts(out);
-							uart_putc(',');
-							
+							char out[5];
+														
 							sprintf(out, "%d", rpm);
 							uart_puts(out);
 							uart_putc(',');
@@ -147,18 +148,23 @@ void main(void)
 							uart_putc('\n');
 							CLEARBIT(status_byte,_send);
 											
-						}*/
-						
+						}
+		#endif
 						
 			if (CHECKBIT(status_byte,_pid))
 					{
+						PORTD |= 1<<PD4;
+						
 						int16_t pwm_temp;
 						pwm_temp = PWM_POWER;
-						pwm_temp += PID(target_rpm - rpm);
+							//target_rpm=3000;
+						pwm_temp += stepPID(&firstPID, rpm, target_rpm);
 						if (pwm_temp>255) pwm_temp=255;
 						if (pwm_temp<0) pwm_temp=0;
 						PWM_POWER = pwm_temp;
 						CLEARBIT(status_byte,_pid);
+						
+						PORTD &= ~((1<<PD4));
 						
 					}
 				
@@ -223,7 +229,8 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 								target_rpm = adc_ch[1]*50;
 							}*/
 							
-						target_rpm = ADCH*50;
+						target_rpm = ADCH*50; //set target rpm
+						
 						ADC_start(7);
 						
 						ten_sec=6;

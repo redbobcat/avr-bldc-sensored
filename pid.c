@@ -1,23 +1,48 @@
+//author: Michiel van der Coelen
+//date 2010-10-10
+
 #include "pid.h"
+#include <avr/io.h>
+#include <math.h>
+void initializePID(struct PID_DATA *pid, float p, float i, float d){
+	pid->lastValue = 0;
+	pid->Kp = p;
+	pid->Ki = i;
+	pid->Kd = d;
+	pid->sumError = 0;
+	pid->maxError = DEFAULT_MAXERROR;
+	if(i) pid->maxSumError = DEFAULT_MAXSUMERROR/i;
+	else pid->maxSumError = DEFAULT_MAXSUMERROR;
+}
 
-volatile uint16_t delta_prev;
-int16_t I;
+int16_t stepPID(struct PID_DATA *pid, float value, float reference){
+	float error, temp, pFactor, iFactor, dFactor;
 
-int16_t PID (int16_t delta)
-	{
-		int32_t U;
-		
-		U  = delta * Kp;
-		
-		I += delta * Ki;
-			if (I>INTEGRAL_MAX) I=INTEGRAL_MAX;
-			if (I<INTEGRAL_MIN) I=INTEGRAL_MIN;
-		
-		U += (delta - delta_prev)*Kp;
-		
-		U += I;
-		
-		delta_prev=delta;
-		
-		return (U/CHANGE_STEP);
-	}
+	error = reference - value;
+	if(error > pid->maxError) error = pid->maxError;
+	if(error < -pid->maxError) error = -pid->maxError;
+	
+	//P
+	pFactor = error * pid->Kp;
+	
+	//I
+	temp = pid->sumError + error;
+	if(temp > pid->maxSumError) temp = pid->maxSumError;
+	if(temp < -pid->maxSumError) temp = -pid->maxSumError;
+	pid->sumError = temp;
+	iFactor = pid->sumError * pid->Ki;
+	
+	//D
+	dFactor = (value - pid->lastValue)*pid->Kd;
+	pid->lastValue = value;
+	
+	temp = pFactor + iFactor + dFactor;
+	
+	return ((int16_t) temp);
+	
+}
+
+void resetSumError(struct PID_DATA *pid){
+	pid->sumError =0;
+	pid->maxSumError = DEFAULT_MAXSUMERROR/pid->Ki;
+}

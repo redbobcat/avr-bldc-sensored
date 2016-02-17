@@ -122,7 +122,7 @@ Date        Description
 /* Set size of receive and transmit buffers */
 
 #ifndef UART_RX0_BUFFER_SIZE
-	#define UART_RX0_BUFFER_SIZE 8 /**< Size of the circular receive buffer, must be power of 2 */
+	#define UART_RX0_BUFFER_SIZE 0 /**< Size of the circular receive buffer, must be power of 2 */
 #endif
 #ifndef UART_RX1_BUFFER_SIZE
 	#define UART_RX1_BUFFER_SIZE 128 /**< Size of the circular receive buffer, must be power of 2 */
