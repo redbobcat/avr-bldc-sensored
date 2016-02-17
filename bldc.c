@@ -141,6 +141,5 @@ inline void bldc_all_init(void)
 ISR(PCINT0_vect)
 	{		
 			PHASE_PORT=bldc_switch(bldc_hall_state(), dir);
-			//USART_Transmit(0x30+bldc_hall_state());
 			sei();
 	}

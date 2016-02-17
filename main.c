@@ -31,34 +31,45 @@
 #define ADC_CURRENT_SENCE 6 //in from amp, 1V to 1A
 
 #include <avr/io.h>
-#include <util/delay.h>
+//#include <util/delay.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
-#include "uart.h"
+//#include "uart.h"
 #include "buttons.h"
 #include "bldc.h"
-#include <stdio.h>
+//#include <stdio.h>
 #include "pid.h"
 
 
 
 
 //counter for serving others, 50hz
-void counter2_init (void);
+inline void counter2_init (void);
 //ISR is in the end
 //variables for counter
-volatile uint8_t one_sec=51,ten_sec=6;
-
+volatile uint8_t ten_sec=6;
+//one_sec=51
 
 //ACD functions
-void ADC_init (void); // init of ADC
+inline void ADC_init (void); // init of ADC
 void ADC_start (uint8_t); // starts converson on ch
 
-volatile uint8_t adc_ch[2];
-volatile uint8_t adc_ch_now=6, send=0, pid=0;
+//volatile uint8_t adc_ch[2], adc_ch_now=6,;
+
+
+volatile uint8_t status_byte=0;
+
+#define SETBIT(x,y) (x |= (y)) /* set bit in x */
+#define CLEARBIT(x,y) (x &= (~y)) /* clear bit in x */
+#define CHECKBIT(x,y) (x & (y)) /* check bit in x */
+ 
+#define _send 0x01 
+#define _pid 0x02
+//#define EMPTY 0x04
+//#define FULL 0x08
 
 //speed mesure and current
-volatile uint16_t rpm=0, target_rpm=0, current=0, temp_num=0;
+volatile uint16_t rpm=0, target_rpm=0, temp_num=0;
 
 
 //buttons and some other
@@ -71,9 +82,9 @@ volatile uint8_t buttons_pressed;
 
 void main(void)
 {
-	uart_init(UART_BAUD_SELECT(19200,F_CPU));
+	//uart_init(UART_BAUD_SELECT(19200,F_CPU));
 	
-	uart_puts_P("BLDC drv\n");
+	//uart_puts_P("BLDC drv\n");
 		
 	bldc_all_init();
 	
@@ -114,32 +125,32 @@ void main(void)
 					bldc_stop();
 					buttons_pressed=0;
 					PORTD &= ~((1<<PD3)|(1<<PD4));
-					send=0;
+					CLEARBIT(status_byte,_send);
 				}
 				
-			if (send)
+			/*if (CHECKBIT(status_byte,_send))
 						{
-							char out[10];
+							char out[6];
 							temp_num++;
 							sprintf(out, "%d", temp_num);
-							//uitoa(temp_num,out,10);
+							
 							
 							uart_puts(out);
 							uart_putc(',');
-							//uitoa(rpm,out,10);
+							
 							sprintf(out, "%d", rpm);
 							uart_puts(out);
 							uart_putc(',');
-							//uitoa(adc_ch[1],out,10);
-							sprintf(out, "%d", adc_ch[1]);
+							
+							sprintf(out, "%d", target_rpm);
 							uart_puts(out);
 							uart_putc('\n');
-							send=0;
+							CLEARBIT(status_byte,_send);
 											
-						}
+						}*/
 						
 						
-			if (pid)
+			if (CHECKBIT(status_byte,_pid))
 					{
 						int16_t pwm_temp;
 						pwm_temp = PWM_POWER;
@@ -147,7 +158,7 @@ void main(void)
 						if (pwm_temp>255) pwm_temp=255;
 						if (pwm_temp<0) pwm_temp=0;
 						PWM_POWER = pwm_temp;
-						pid=0;
+						CLEARBIT(status_byte,_pid);
 						
 					}
 				
@@ -158,7 +169,7 @@ void main(void)
 		
 }
 //END OF MAIN
-void counter2_init (void)
+inline void counter2_init (void)
 	{
 		TCCR2A |= (1<<WGM21); //CTC mode
 		TCCR2B |= 7;//(7<<CS20); //prescaler /1024
@@ -166,14 +177,12 @@ void counter2_init (void)
 		TIMSK2 |= (1<<OCIE2A); //enabling A interupt
 	}
 	
-
-
-	
-void ADC_init (void)
+inline void ADC_init (void)
 	{
 		ADMUX |= (1<<REFS0) | (1<<ADLAR); //ref to VCC, left adjust
 		ADCSRA |= (1<<ADEN) | (6<<ADPS0); //enabling ADC, pescaling /64, 180Khz
 	}
+	
 void ADC_start (uint8_t chno)
 	{
 		ADMUX = (ADMUX & 0b11110000) | (chno); //set chanel
@@ -182,15 +191,11 @@ void ADC_start (uint8_t chno)
 
 ISR (TIMER2_COMPA_vect) //50 times/s
 	{
-		
-			
-			
-			
-			if (one_sec==0) //1 time in sec
+			/*if (one_sec==0) //1 time in sec
 				{
 					
 					one_sec=51;
-				}
+				}*/
 			if (ten_sec==0) //10 tims in sec
 				{
 					rpm = ticks/3;
@@ -198,13 +203,13 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 					ticks =0;
 					if (dir) 
 						{
-							send=1;
-							pid=1;
+							SETBIT(status_byte,_send);
+							SETBIT(status_byte,_pid);
 						}
 						
 					
 						buttons_pressed |= buttons();
-						if (adc_ch_now==6)
+						/*if (adc_ch_now==6)
 							{ //from isense resistor
 								adc_ch[0] = ADCH;
 								adc_ch_now=7;
@@ -216,7 +221,10 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 								adc_ch_now=6;
 								ADC_start(adc_ch_now);
 								target_rpm = adc_ch[1]*50;
-							}
+							}*/
+							
+						target_rpm = ADCH*50;
+						ADC_start(7);
 						
 						ten_sec=6;
 						
@@ -224,7 +232,7 @@ ISR (TIMER2_COMPA_vect) //50 times/s
 			
 			
 			ten_sec--;
-			one_sec--;
+			//one_sec--;
 			sei();
 	}
 

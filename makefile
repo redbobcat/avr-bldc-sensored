@@ -40,7 +40,7 @@ SRC = $(TARGET).c \
 uart.c \
 buttons.c \
 bldc.c \
-pid.c
+pid.c \
 
 
 
@@ -189,7 +189,8 @@ REMOVE = rm -f
 COPY = cp
 
 HEXSIZE = $(SIZE) --target=$(FORMAT) $(TARGET).hex
-ELFSIZE = $(SIZE) -A $(TARGET).elf
+#ELFSIZE = $(SIZE) -A $(TARGET).elf
+ELFSIZE = $(SIZE) --format=avr --mcu=$(MCU) $(TARGET).elf
 
 
 

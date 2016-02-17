@@ -1,10 +1,11 @@
 #include "pid.h"
 
-volatile int16_t delta_prev;
+volatile uint16_t delta_prev;
+int16_t I;
 
 int16_t PID (int16_t delta)
 	{
-		double_t U, I, D;
+		int32_t U;
 		
 		U  = delta * Kp;
 		
@@ -12,9 +13,9 @@ int16_t PID (int16_t delta)
 			if (I>INTEGRAL_MAX) I=INTEGRAL_MAX;
 			if (I<INTEGRAL_MIN) I=INTEGRAL_MIN;
 		
-		D = (delta - delta_prev)*Kp;
+		U += (delta - delta_prev)*Kp;
 		
-		U += I + D;
+		U += I;
 		
 		delta_prev=delta;
 		
